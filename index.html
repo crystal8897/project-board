@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#000">
+<title>项目看板</title><style>html,body{margin:0;height:100%;background:#000;color:#f5f5f7;font-family:-apple-system,"PingFang SC",sans-serif}
+.c{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.l{width:64px;height:64px;border-radius:20px;background:rgba(28,28,30,.8);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:28px}
+.t{font-size:17px;font-weight:600}.s{font-size:13px;color:rgba(235,235,245,.5)}
+.b{width:160px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}.b i{display:block;height:100%;width:0;background:#0A84FF;transition:width .2s}</style></head>
+<body><div class="c"><div class="l" id="ic">🔒</div><div class="t" id="t">项目看板</div><div class="s" id="s">正在解密…</div><div class="b"><i id="bar"></i></div></div>
+<script>
+(async function(){
+ var S=document.getElementById('s'),bar=document.getElementById('bar');
+ function lock(m){document.getElementById('ic').textContent='🔒';document.getElementById('t').textContent='已加密';S.textContent=m;bar.parentNode.style.display='none';}
+ var m=location.hash.match(/k=([A-Za-z0-9_-]{43})/);
+ if(m){localStorage.setItem('board_k',m[1]);history.replaceState(null,'',location.pathname+'#/');}
+ var k=localStorage.getItem('board_k');if(!k)return lock('需要带密钥的链接才能打开');
+ try{
+  var raw=Uint8Array.from(atob(k.replace(/-/g,'+').replace(/_/g,'/')+'='),function(c){return c.charCodeAt(0)});
+  var key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
+  var r=await fetch('board.bin?t='+Date.now(),{cache:'no-store'});var tot=+r.headers.get('content-length')||0,got=0,ch=[],rd=r.body.getReader();
+  for(;;){var x=await rd.read();if(x.done)break;ch.push(x.value);got+=x.value.length;if(tot)bar.style.width=(got/tot*100)+'%';}
+  var b=new Uint8Array(await new Blob(ch).arrayBuffer());S.textContent='解密中…';
+  var pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12));
+  var html=await new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  document.open();document.write(html);document.close();
+ }catch(e){localStorage.removeItem('board_k');lock('密钥不对或文件损坏');}
+})();
+</script></body></html>
